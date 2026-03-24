@@ -4,7 +4,7 @@ class Settings(BaseSettings):
     app_name: str = "Payment Gateaway API"
     app_version: str = "0.1.0"
     app_description: str = "A Stripe-like payment gateway built with FastAPI for learning purposes."
-    # database_url
+    database_url: str = "sqlite:///./payment_gateway.db"
     # debug?
 
 settings = Settings()
