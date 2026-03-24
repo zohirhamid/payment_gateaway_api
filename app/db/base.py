@@ -3,6 +3,7 @@ from sqlalchemy.orm import declarative_base
 
 Base = declarative_base()
 
-# import models here so SQLAlchemy knows about them
-from app.db.models.merchant import Merchant # noqa
+# Import model modules (not symbols) so SQLAlchemy registers tables on Base.metadata,
+# while avoiding circular imports (models import Base).
+import app.db.models.merchant  # noqa: F401
 

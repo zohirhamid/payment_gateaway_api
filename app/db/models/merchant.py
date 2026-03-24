@@ -7,6 +7,9 @@ from app.db.base import Base
 class Merchant(Base):
     __tablename__ = "merchants"
 
-    id = Column(Integer, primary_key=True, index=True)
-    name = Column(String, nullable=False)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    api_key_hash: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
+    webhook_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+
     
