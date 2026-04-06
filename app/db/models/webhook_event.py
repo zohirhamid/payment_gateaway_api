@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Mapped, mapped_column
-from sqlalchemy import DateTime, ForeignKey, String, func
+from sqlalchemy import DateTime, ForeignKey, Integer, String, func
 
 from app.db.base import Base
 
@@ -35,6 +35,11 @@ class WebhookEvent(Base):
 
     # Delivery state: pending | delivered | failed
     delivery_status: Mapped[str] = mapped_column(String(50), nullable=False, default="pending")
+
+    # Retry tracking
+    retry_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    last_attempt_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_error: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
     created_at: Mapped[DateTime] = mapped_column(
         DateTime(timezone=True),
