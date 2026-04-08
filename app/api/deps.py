@@ -45,3 +45,10 @@ def get_idempotency_key(idempotency_key: str | None = Header(default=None)) -> s
     without manually parsing headers.
     '''
     return idempotency_key
+
+
+def enforce_create_payment_limit():
+    pass
+
+def enforce_confirm_payment_limit():
+    pass
