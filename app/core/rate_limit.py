@@ -44,7 +44,6 @@ def raise_rate_limit_exceeded(rule: RateLimitRule, result: RateLimitResult) -> N
         headers={"Retry-After": str(result.retry_after)},
     )
 
-
 def get_window_start(now: int, window_seconds: int) -> int:
     return now - (now % window_seconds)
 

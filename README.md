@@ -23,7 +23,8 @@ The system is designed with production-style patterns such as idempotency, event
 - 💰 PaymentIntent lifecycle management
 - ⚡ Charge creation and state transitions
 - 🔁 Idempotency support (safe retries)
-- 🔔 Webhook event creation and delivery with retry logic
+- � Merchant-scoped rate limiting for payment endpoints
+- �🔔 Webhook event creation and delivery with retry logic
 - 🔄 Background task processing for webhooks
 - 🧪 End-to-end integration tests (pytest)
 - 🗄️ Database migrations with Alembic
@@ -161,8 +162,11 @@ Features:
 git clone <your-repo>
 cd payment-gateway
 pip install -r requirements.txt
+pip install redis
 alembic upgrade head
 ```
+
+> Rate limiting depends on Redis. The app defaults to `redis://localhost:6379/0` when `redis_url` is not configured.
 
 ---
 
