@@ -16,7 +16,6 @@ import time
 from fastapi import Depends, HTTPException
 from app.db.models.merchant import Merchant
 from app.api.deps import get_current_merchant, get_redis
-from app.core.config import settings
 
 @dataclass(frozen=True)
 class RateLimitRule:
@@ -32,6 +31,7 @@ class RateLimitResult:
     remaining: int
     retry_after: int
     reset_after: int
+
 
 def raise_rate_limit_exceeded(rule: RateLimitRule, result: RateLimitResult) -> None:
     raise HTTPException(
@@ -51,7 +51,7 @@ def get_window_start(now: int, window_seconds: int) -> int:
 def get_window_reset(now: int, window_seconds: int) -> int:
     '''
     computes how many seconds remain before the current window ends '''
-    return get_window_start(now, window_seconds) + window_seconds
+    return get_window_start(now, window_seconds) + window_seconds - now
     
 def build_rate_limit_key(scope: str, merchant_id: str, window_start):
     return f"rate_limit:{scope}:merchant:{merchant_id}:{window_start}"
@@ -60,8 +60,8 @@ def get_rate_limit_subject(merchant: Merchant = Depends(get_current_merchant)) -
     return str(merchant.id)
 
 def check_rate_limit(redis, now: int, rule: RateLimitRule, merchant: Merchant = Depends(get_current_merchant)) -> RateLimitResult:
-    window_start = get_window_start(now, settings.WINDOW_SECONDS)
-    retry_after = get_window_reset(now, settings.WINDOW_SECONDS)
+    window_start = get_window_start(now, rule.window_seconds)
+    retry_after = get_window_reset(now, rule.window_seconds)
     redis_key = build_rate_limit_key(rule.scope, str(merchant.id), window_start)
 
     current_count = redis.incr(redis_key)
