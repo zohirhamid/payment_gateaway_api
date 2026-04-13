@@ -8,7 +8,7 @@ from app.db.session import get_db
 from app.services.auth_service import get_merchant_by_api_key
 
 from importlib import import_module
-from app.core.rate_limit import RateLimitRule, rate_limit
+from app.core.rate_limit import RateLimitRule, enforce_rate_limit
 
 _redis_client = None
 
@@ -25,8 +25,12 @@ CONFIRM_PAYMENT_RULE = RateLimitRule(
     window_seconds=60,
 )
 
-create_payment_intent_rate_limit = rate_limit(CREATE_PAYMENT_INTENT_RULE)
-confirm_payment_rate_limit = rate_limit(CONFIRM_PAYMENT_RULE)
+CANCEL_PAYMENT_RULE = RateLimitRule(
+    scope="cancel_payment",
+    limit=10,
+    window_seconds=60,
+)
+
 
 def get_redis():
     """Return a shared Redis client for request dependencies."""
@@ -66,10 +70,17 @@ def get_current_merchant(db: Session = Depends(get_db), credentials: HTTPAuthori
     return merchant 
 
 def get_idempotency_key(idempotency_key: str | None = Header(default=None)) -> str | None:
-    '''
-    Read the Idempotency-Key header from the request.
-
-    We keep this as a dependency so write endpoints can opt into idempotency support
-    without manually parsing headers.
-    '''
     return idempotency_key
+
+def rate_limit_dependency(rule: RateLimitRule):
+    def dependency(
+        redis=Depends(get_redis),
+        merchant=Depends(get_current_merchant),
+    ):
+        return enforce_rate_limit(redis=redis, merchant_id=str(merchant.id), rule=rule)
+
+    return dependency
+
+create_payment_intent_rate_limit = rate_limit_dependency(CREATE_PAYMENT_INTENT_RULE)
+confirm_payment_rate_limit = rate_limit_dependency(CONFIRM_PAYMENT_RULE)
+cancel_payment_rate_limit = rate_limit_dependency(CANCEL_PAYMENT_RULE)

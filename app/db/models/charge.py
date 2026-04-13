@@ -14,9 +14,8 @@ class Charge(Base):
         unique=True,
     )
     merchant_id: Mapped[int] = mapped_column(
-        ForeignKey("merchant.id"),
+        ForeignKey("merchants.id"),
         nullable=False,
-        unique=True,
     )
     amount: Mapped[int] = mapped_column(nullable=False)
     currency: Mapped[str] = mapped_column(String(3), nullable=False)

@@ -1,34 +1,33 @@
 from typing import List
-import json
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Response
+from datetime import datetime
+
+from fastapi import APIRouter, BackgroundTasks, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_merchant, get_db, get_idempotency_key
-from app.utils.hashing import hash_request_payload
 
 from app.db.models.merchant import Merchant
-from app.db.models.payment_intent import PaymentIntent
 from app.schemas.payment_intent import PaymentIntentCreate, PaymentIntentResponse
 
-from app.db.models.charge import Charge
 from app.schemas.payment_intent import PaymentIntentConfirmResponse
 
-from app.services.payment_service import build_webhook_payload, simulate_payment_result
-from app.services.webhook_service import create_webhook_event, deliver_webhook_event_task
-from app.services.idempotency_service import (
-    create_idempotency_record,
-    get_idempotency_record,
-)
-
-from app.core.enums import PaymentIntentStatus
+from app.services.webhook_service import deliver_webhook_event_task
 
 from app.api.deps import (
     create_payment_intent_rate_limit,
+    cancel_payment_rate_limit,
     confirm_payment_rate_limit,
 )
 
-from app.services.payment_state_machine import apply_payment_intent_status_transition
+from app.services.payment_intent_service import (
+    cancel_payment_intent as cancel_payment_intent_service,
+    create_payment_intent as create_payment_intent_service,
+    confirm_payment_intent as confirm_payment_intent_service,
+    get_payment_intent as get_payment_intent_service,
+    list_payment_intents as list_payment_intents_service,
+)
+from app.core.enums import PaymentIntentStatus
 
 router = APIRouter(prefix="/payment_intents", tags=["payment_intents"])
 
@@ -40,95 +39,49 @@ def create_payment_intent(
     current_merchant: Merchant = Depends(get_current_merchant),
     idempotency_key: str | None = Depends(get_idempotency_key)
 ):
-
-    # idempotency
-    request_hash = hash_request_payload(payload.model_dump())
-
-    if idempotency_key:
-        existing_record = get_idempotency_record(
-            db=db,
-            merchant_id=current_merchant.id,
-            endpoint="create_payment_intent",
-            idempotency_key=idempotency_key,
-        )
-
-        if existing_record:
-            if existing_record.request_hash != request_hash:
-                raise HTTPException(
-                    status_code=409,
-                    detail="Idempotency key was already used with a different payload.",
-                )
-            # return existing response
-            return PaymentIntentResponse(**json.loads(existing_record.response_body))
-
-
-    # First time?
-    payment_intent = PaymentIntent(
+    response_payload = create_payment_intent_service(
+        db=db,
         merchant_id=current_merchant.id,
-        amount=payload.amount,
-        currency=payload.currency.upper(),
-        status=PaymentIntentStatus.REQUIRES_PAYMENT_METHOD,
+        payload=payload,
+        idempotency_key=idempotency_key,
     )
-
-    db.add(payment_intent)
-    db.commit()
-    db.refresh(payment_intent)
-
-    response_payload = {
-        "id": payment_intent.id,
-        "merchant_id": payment_intent.merchant_id,
-        "amount": payment_intent.amount,
-        "currency": payment_intent.currency,
-        "status": payment_intent.status,
-        "created_at": payment_intent.created_at.isoformat(), # type: ignore
-    }
-
-    if idempotency_key:
-        create_idempotency_record(
-            db=db,
-            merchant_id=current_merchant.id,
-            endpoint="create_payment_intent",
-            idempotency_key=idempotency_key,
-            request_hash=request_hash,
-            response_status_code=200,
-            response_body=json.dumps(response_payload),
-        )
-
-    return payment_intent
+    return PaymentIntentResponse(**response_payload)
 
 @router.get("/{payment_intent_id}", response_model=PaymentIntentResponse)
 def get_payment_intent(
     payment_intent_id: int,
     db: Session = Depends(get_db),
     current_merchant: Merchant = Depends(get_current_merchant)):
-
-    payment_intent = (
-        db.query(PaymentIntent)
-        .filter(
-            PaymentIntent.id == payment_intent_id,
-            PaymentIntent.merchant_id == current_merchant.id,
-        )
-        .first()
+    return get_payment_intent_service(
+        db=db,
+        merchant_id=current_merchant.id,
+        payment_intent_id=payment_intent_id,
     )
-
-    if payment_intent is None:
-        raise HTTPException(status_code=404, detail="Payment intent not found.")
-
-    return payment_intent
 
 @router.get("/", response_model=List[PaymentIntentResponse])
 def get_payment_intents(
+    status: PaymentIntentStatus | None = None,
+    currency: str | None = None,
+    amount_gte: int | None = Query(default=None, ge=1),
+    amount_lte: int | None = Query(default=None, ge=1),
+    created_at_gte: datetime | None = None,
+    created_at_lte: datetime | None = None,
+    limit: int = Query(default=100, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
     current_merchant: Merchant = Depends(get_current_merchant),):
-
-    payment_intents = (
-        db.query(PaymentIntent)
-        .filter(PaymentIntent.merchant_id == current_merchant.id)
-        .order_by(PaymentIntent.id.desc())
-        .all()
+    return list_payment_intents_service(
+        db=db,
+        merchant_id=current_merchant.id,
+        status=status,
+        currency=currency,
+        amount_gte=amount_gte,
+        amount_lte=amount_lte,
+        created_at_gte=created_at_gte,
+        created_at_lte=created_at_lte,
+        limit=limit,
+        offset=offset,
     )
-
-    return payment_intents
 
 @router.post("/{payment_intent_id}/confirm", dependencies=[Depends(confirm_payment_rate_limit)], response_model=PaymentIntentConfirmResponse)
 def confirm_payment_intent(
@@ -138,136 +91,35 @@ def confirm_payment_intent(
     current_merchant: Merchant = Depends(get_current_merchant),
     idempotency_key: str | None = Depends(get_idempotency_key),
 ):
-
-    # Created a hashed payload
-    confirm_payload = { # the id of a specific payment intent
-        "payment_intent_id": payment_intent_id
-        }
-    request_hash = hash_request_payload(confirm_payload)
-
-    # 
-    if idempotency_key:
-        existing_record = get_idempotency_record(
-            db=db,
-            merchant_id=current_merchant.id,
-            endpoint="confirm_payment_intent",
-            idempotency_key=idempotency_key,
-        )
-
-        if existing_record:
-            if existing_record.request_hash != request_hash:
-                raise HTTPException(
-                    status_code=409,
-                    detail="Idempotency key was already used with a different payload.",
-                )
-            return PaymentIntentConfirmResponse(**json.loads(existing_record.response_body))
-          
-    payment_intent = ( # get the current payment intent and check if it belongs to the current merchant
-        db.query(PaymentIntent)
-        .filter(
-            PaymentIntent.id == payment_intent_id,
-            PaymentIntent.merchant_id == current_merchant.id,
-        ).first()
-    )
-
-    if payment_intent is None:
-        raise HTTPException(status_code=404, detail="Payment intent not found.")
-    
-    
-    # A payment intent can only be confirmed once in this MVP.
-    # After confirmation, it moves to a terminal state:
-    # - succeeded
-    # - failed
-    #
-    # This prevents duplicate charge creation from repeated confirm calls.
-    if payment_intent.status != PaymentIntentStatus.REQUIRES_CONFIRMATION:
-        raise HTTPException(
-            status_code=409,
-            detail="Payment intent cannot be confirmed in its current state.",
-        )
-
-    payment_intent = apply_payment_intent_status_transition(
-        db=db,
-        intent=payment_intent,
-        new_status=PaymentIntentStatus.PROCESSING
-    )
-
-    charge = Charge( # Create a charge for the current paymentIntent
-        payment_intent_id=payment_intent.id,
-        amount=payment_intent.amount,
-        currency=payment_intent.currency,
-        status="pending",
-    )
-    db.add(charge)
-    db.commit()
-    db.refresh(charge)
-
-    # Step 2: simulates the payment outcome
-    result = simulate_payment_result()
-
-    if result == "succeeded":
-        charge.status = "succeeded"
-        db.add(charge)
-        db.commit()
-        db.refresh(charge)
-
-        payment_intent = apply_payment_intent_status_transition(
-            db=db,
-            intent=payment_intent,
-            new_status=PaymentIntentStatus.SUCCEEDED,
-        )
-    else:
-        charge.status = "failed"
-        charge.failure_reason = "Payment was declined"
-        db.add(charge)
-        db.commit()
-        db.refresh(charge)
-
-        payment_intent = apply_payment_intent_status_transition(
-            db=db,
-            intent=payment_intent,
-            new_status=PaymentIntentStatus.FAILED,
-            failure_reason="Payment was declined",
-        )
-
-
-    # Creates a webhook event (for the payment result)
-    event_type = (
-        "payment.succeeded"
-        if payment_intent.status == "succeeded"
-        else "payment.failed"
-    )
-
-    webhook_payload = build_webhook_payload(payment_intent=payment_intent, event_id=0)
-
-    webhook_event = create_webhook_event(
+    response_payload, webhook_event_id = confirm_payment_intent_service(
         db=db,
         merchant_id=current_merchant.id,
-        payment_intent_id=payment_intent.id,
-        event_type=event_type,
-        payload=webhook_payload,
+        payment_intent_id=payment_intent_id,
+        idempotency_key=idempotency_key,
     )
 
-    background_tasks.add_task(
-        deliver_webhook_event_task,
-        webhook_event.id,
+    if webhook_event_id is not None:
+        background_tasks.add_task(deliver_webhook_event_task, webhook_event_id)
+
+    return PaymentIntentConfirmResponse(**response_payload)
+
+
+@router.post(
+    "/{payment_intent_id}/cancel",
+    dependencies=[Depends(cancel_payment_rate_limit)],
+    response_model=PaymentIntentResponse,
+)
+def cancel_payment_intent(
+    payment_intent_id: int,
+    db: Session = Depends(get_db),
+    current_merchant: Merchant = Depends(get_current_merchant),
+    idempotency_key: str | None = Depends(get_idempotency_key)):
+
+    payload = cancel_payment_intent_service(
+        db=db,
+        merchant_id=current_merchant.id,
+        payment_intent_id=payment_intent_id,
+        idempotency_key=idempotency_key,
     )
-
-    response_payload = {
-        "payment_intent_id": payment_intent.id,
-        "charge_id": charge.id,
-        "status": payment_intent.status,
-    }
-
-    if idempotency_key:
-        create_idempotency_record(
-            db=db,
-            merchant_id=current_merchant.id,
-            endpoint="confirm_payment_intent",
-            idempotency_key=idempotency_key,
-            request_hash=request_hash,
-            response_status_code=200,
-            response_body=json.dumps(response_payload),
-        )
-
-    return response_payload
+    
+    return PaymentIntentResponse(**payload)

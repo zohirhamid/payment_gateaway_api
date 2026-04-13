@@ -101,3 +101,31 @@ def test_list_payment_intents():
     amounts = [item["amount"] for item in data]
     assert 1000 in amounts
     assert 2000 in amounts
+
+
+def test_list_payment_intents_filters_currency():
+    merchant_data = create_test_merchant()
+    api_key = merchant_data["api_key"]
+
+    gbp_intent = client.post(
+        "/payment_intents/",
+        headers={"Authorization": f"Bearer {api_key}"},
+        json={"amount": 1000, "currency": "gbp"},
+    ).json()
+
+    usd_intent = client.post(
+        "/payment_intents/",
+        headers={"Authorization": f"Bearer {api_key}"},
+        json={"amount": 2000, "currency": "usd"},
+    ).json()
+
+    list_response = client.get(
+        "/payment_intents/?currency=USD",
+        headers={"Authorization": f"Bearer {api_key}"},
+    )
+    assert list_response.status_code == 200
+    data = list_response.json()
+
+    ids = [item["id"] for item in data]
+    assert usd_intent["id"] in ids
+    assert gbp_intent["id"] not in ids

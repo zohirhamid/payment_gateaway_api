@@ -1,21 +1,9 @@
-'''
-It should contain:
-    rule dataclass + 
-    result dataclass + 
-    fixed-window helper functions 
-    Redis key builder 
-    merchant subject extraction 
-    Redis counter check logic 
-    dependency factory 
-'''
-
 from dataclasses import dataclass
 
 import time
 
 from fastapi import Depends, HTTPException
 from app.db.models.merchant import Merchant
-from app.api.deps import get_current_merchant, get_redis
 
 @dataclass(frozen=True)
 class RateLimitRule:
@@ -48,20 +36,15 @@ def get_window_start(now: int, window_seconds: int) -> int:
     return now - (now % window_seconds)
 
 def get_window_reset(now: int, window_seconds: int) -> int:
-    '''
-    computes how many seconds remain before the current window ends '''
     return get_window_start(now, window_seconds) + window_seconds - now
     
 def build_rate_limit_key(scope: str, merchant_id: str, window_start):
     return f"rate_limit:{scope}:merchant:{merchant_id}:{window_start}"
 
-def get_rate_limit_subject(merchant: Merchant = Depends(get_current_merchant)) -> str:
-    return str(merchant.id)
-
-def check_rate_limit(redis, now: int, rule: RateLimitRule, merchant: Merchant = Depends(get_current_merchant)) -> RateLimitResult:
+def check_rate_limit(redis, now: int, rule: RateLimitRule, merchant_id: str) -> RateLimitResult:
     window_start = get_window_start(now, rule.window_seconds)
     retry_after = get_window_reset(now, rule.window_seconds)
-    redis_key = build_rate_limit_key(rule.scope, str(merchant.id), window_start)
+    redis_key = build_rate_limit_key(rule.scope, merchant_id, window_start)
 
     current_count = redis.incr(redis_key)
 
@@ -77,21 +60,15 @@ def check_rate_limit(redis, now: int, rule: RateLimitRule, merchant: Merchant = 
         current_count=current_count,
         remaining=remaining,
         retry_after=retry_after if not allowed else 0,
-        reset_after=retry_after
+        reset_after=retry_after,
     )
 
 
-def rate_limit(rule: RateLimitRule):
-    def dependency(
-        redis=Depends(get_redis), merchant: Merchant = Depends(get_current_merchant)
-        )-> RateLimitResult:
+def enforce_rate_limit(redis, merchant_id: str, rule: RateLimitRule) -> RateLimitResult:
+    now = int(time.time())
+    result = check_rate_limit(redis, now, rule, merchant_id)
 
-        now = int(time.time())
-        result = check_rate_limit(redis, now, rule, merchant)
+    if not result.allowed:
+        raise_rate_limit_exceeded(rule, result)
 
-        if not result.allowed:
-            raise_rate_limit_exceeded(rule, result)
-
-        return result
-
-    return dependency
+    return result

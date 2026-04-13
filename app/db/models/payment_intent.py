@@ -17,7 +17,7 @@ class PaymentIntent(Base):
         nullable=False,
         default=PaymentIntentStatus.REQUIRES_PAYMENT_METHOD,
     )
-    metadata: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    extra_data: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     #payment_method_reference: Mapped[] = mapped_column() (a reference to payment_methods table)
     failure_reason: Mapped[str | None] = mapped_column(String(255), nullable=True)
     created_at: Mapped[DateTime] = mapped_column(

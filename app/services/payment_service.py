@@ -24,9 +24,10 @@ def build_webhook_payload(payment_intent: PaymentIntent, event_id: int):
     or sent as JSON to a merchant webhook endpoint.
     '''
 
+    status_value = getattr(payment_intent.status, "value", payment_intent.status)
     event_type = (
         "payment.succeeded"
-        if payment_intent.status == "succeeded"
+        if status_value == "succeeded"
         else "payment.failed"
     )
 
@@ -37,9 +38,8 @@ def build_webhook_payload(payment_intent: PaymentIntent, event_id: int):
             payment_intent_id=payment_intent.id,
             amount=payment_intent.amount,
             currency=payment_intent.currency,
-            status=payment_intent.status
+            status=status_value,
         ),
     )
 
     return payload.model_dump()
-

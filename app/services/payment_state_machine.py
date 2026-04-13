@@ -10,13 +10,13 @@ from app.db.models.payment_intent import PaymentIntent
 def apply_payment_intent_status_transition(
         *,
         db: Session,
-        intent: PaymentIntent,
+        payment_intent: PaymentIntent,
         new_status: PaymentIntentStatus,
         occurred_at: datetime | None = None,
         failure_reason: str | None = None,
 ) -> PaymentIntent:
     
-    current_status = intent.status
+    current_status = payment_intent.status
     
     validate_status = transition_status(
         current_status=current_status,
@@ -26,24 +26,24 @@ def apply_payment_intent_status_transition(
     timestamp = occurred_at or datetime.now(timezone.utc)
 
     # update status
-    intent.status = validate_status
+    payment_intent.status = validate_status
 
     # Set timestamp
     timestamp_field = status_timestamp_field(validate_status)
     if timestamp_field:
-        setattr(intent, timestamp_field, timestamp)
+        setattr(payment_intent, timestamp_field, timestamp)
 
     # handle failure reason
     if validate_status == PaymentIntentStatus.FAILED:
-        intent.failure_reason = failure_reason
+        payment_intent.failure_reason = failure_reason
     else:
-        intent.failure_reason = None
+        payment_intent.failure_reason = None
 
-    db.add(intent)
+    db.add(payment_intent)
     db.commit()
-    db.refresh(intent)
+    db.refresh(payment_intent)
 
-    return intent
+    return payment_intent
 
 
 def status_timestamp_field(status: PaymentIntentStatus) -> str | None:
