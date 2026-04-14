@@ -1,22 +1,37 @@
 from fastapi.testclient import TestClient
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
 
 from app.main import app
+from app.db.base import Base
+from app.core.config import settings
+
+# Create test database
+engine = create_engine(settings.database_url)
+Base.metadata.create_all(bind=engine)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 client = TestClient(app)
 
 
 def create_test_merchant():
     response = client.post("/merchants/")
+    print(f"Merchant creation response: {response.status_code} - {response.text}")
     assert response.status_code == 200
     return response.json()
 
 
-def create_payment_intent(api_key: str, amount: int = 1000, currency: str = "gbp"):
+def create_payment_intent(api_key: str, amount: int = 1000, currency: str = "GBP"):
+    print(f"Creating payment intent with amount={amount}, currency={currency}")
     response = client.post(
         "/payment_intents/",
         headers={"Authorization": f"Bearer {api_key}"},
         json={"amount": amount, "currency": currency},
     )
+    print(f"Response status: {response.status_code}")
+    print(f"Response body: {response.text}")
+    if response.status_code != 200:
+        print(f"Error response: {response.json()}")
     assert response.status_code == 200
     return response.json()
 

@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from sqlalchemy import Column, DateTime, Integer, String, func
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -11,7 +13,7 @@ class Merchant(Base):
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     api_key_hash: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
     webhook_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
-    created_at: Mapped[DateTime] = mapped_column(
+    created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
         nullable=False,

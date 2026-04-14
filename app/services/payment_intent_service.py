@@ -4,7 +4,7 @@ from datetime import datetime
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
-from app.core.enums import PaymentIntentStatus
+from app.core.enums import ChargeStatus, PaymentIntentStatus
 from app.db.models.charge import Charge
 from app.db.models.payment_intent import PaymentIntent
 from app.schemas.payment_intent import PaymentIntentCreate
@@ -123,9 +123,7 @@ def attach_payment_method(
             detail="Payment method cannot be attached in the current state.",
         )
 
-    existing_extra_data = payment_intent.extra_data or {}
-    existing_extra_data["payment_method_reference"] = payment_method_reference
-    payment_intent.extra_data = existing_extra_data
+    payment_intent.payment_method_reference = payment_method_reference
 
     payment_intent = apply_payment_intent_status_transition(
         db=db,
@@ -332,7 +330,7 @@ def confirm_payment_intent(
         payment_intent=payment_intent,
         new_status=(
             PaymentIntentStatus.REQUIRES_CAPTURE
-            if charge.status == "authorized"
+            if charge.status == ChargeStatus.AUTHORIZED
             else PaymentIntentStatus.FAILED
         ),
         failure_reason=failure_reason,
@@ -402,6 +400,7 @@ def capture_payment_intent(
         idempotency_key=idempotency_key,
         request_hash=request_hash,
     )
+    
     if existing_response is not None:
         return existing_response, None
 
@@ -430,13 +429,13 @@ def capture_payment_intent(
     if charge is None:
         raise HTTPException(status_code=404, detail="Charge not found.")
 
-    if charge.status != "authorized":
+    if charge.status != ChargeStatus.AUTHORIZED:
         raise HTTPException(
             status_code=409,
             detail="Charge is not in a capturable state.",
         )
 
-    charge.status = "captured"
+    charge.status = ChargeStatus.CAPTURED
     db.add(charge)
     db.commit()
     db.refresh(charge)

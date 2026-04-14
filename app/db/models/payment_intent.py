@@ -1,4 +1,6 @@
-from sqlalchemy import JSON, DateTime, Enum, ForeignKey, String, func
+from datetime import datetime
+
+from sqlalchemy import DateTime, Enum, ForeignKey, String, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.enums import PaymentIntentStatus
@@ -17,22 +19,21 @@ class PaymentIntent(Base):
         nullable=False,
         default=PaymentIntentStatus.REQUIRES_PAYMENT_METHOD,
     )
-    extra_data: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     payment_method_reference: Mapped[str | None] = mapped_column(String(255), nullable=True) # (a reference to payment_methods table)
     failure_reason: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    created_at: Mapped[DateTime] = mapped_column(
+    created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
         nullable=False,
     )
-    updated_at: Mapped[DateTime] = mapped_column(
+    updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
         onupdate=func.now(),
         nullable=False,
     )
-    confirmed_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True))
-    processing_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True))
-    succeeded_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True))
-    failed_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True))
-    canceled_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True))
+    confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    processing_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    succeeded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    failed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    canceled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

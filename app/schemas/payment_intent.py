@@ -1,5 +1,3 @@
-"""Pydantic schemas used by the PaymentIntent API endpoints."""
-
 from datetime import datetime
 
 from pydantic import BaseModel, Field, field_validator
@@ -17,8 +15,7 @@ class PaymentIntentCreate(BaseModel):
         # Maximum amount: 99999999 (about $1M for USD)
         if v > 99999999:
             raise ValueError('Amount exceeds maximum allowed value')
-            
-        
+
         # currency specific minimums
         min_amounts = {
             'USD': 50,  # 50 cents minimum
@@ -26,6 +23,12 @@ class PaymentIntentCreate(BaseModel):
             'GBP': 30,  # 30 pence minimum
             'JPY': 1,   # 1 yen minimum
         }
+
+        minimum_amount = min_amounts.get(currency)
+        if minimum_amount is not None and v < minimum_amount:
+            raise ValueError(f'Amount must be at least {minimum_amount} for {currency}')
+
+        return v
     
     @field_validator('currency')
     @classmethod

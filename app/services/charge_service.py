@@ -6,6 +6,7 @@ later, how to talk to processor integrations
 
 from sqlalchemy.orm import Session
 
+from app.core.enums import ChargeStatus
 from app.db.models.charge import Charge
 from app.db.models.payment_intent import PaymentIntent
 from app.services.payment_service import simulate_payment_result
@@ -28,7 +29,7 @@ def create_and_process_charge(
         merchant_id=merchant_id,
         amount=payment_intent.amount,
         currency=payment_intent.currency,
-        status="pending",
+        status=ChargeStatus.PENDING,
     )
     db.add(charge)
     db.commit()
@@ -38,9 +39,9 @@ def create_and_process_charge(
     failure_reason = None
 
     if result == "authorized":
-        charge.status = "authorized"
+        charge.status = ChargeStatus.AUTHORIZED
     else:
-        charge.status = "failed"
+        charge.status = ChargeStatus.FAILED
         failure_reason = "Payment was declined"
         charge.failure_reason = failure_reason
 

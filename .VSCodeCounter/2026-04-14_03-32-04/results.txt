@@ -1,0 +1,81 @@
+Date : 2026-04-14 03:32:04
+Directory : /home/zo/Desktop/CODE/Projects/payment_gateway/app
+Total : 45 files,  1472 codes, 155 comments, 400 blanks, all 2027 lines
+
+Languages
++----------+------------+------------+------------+------------+------------+
+| language | files      | code       | comment    | blank      | total      |
++----------+------------+------------+------------+------------+------------+
+| Python   |         45 |      1,472 |        155 |        400 |      2,027 |
++----------+------------+------------+------------+------------+------------+
+
+Directories
++---------------------------------------------------------------------------------------+------------+------------+------------+------------+------------+
+| path                                                                                  | files      | code       | comment    | blank      | total      |
++---------------------------------------------------------------------------------------+------------+------------+------------+------------+------------+
+| .                                                                                     |         45 |      1,472 |        155 |        400 |      2,027 |
+| . (Files)                                                                             |          2 |         32 |         12 |         10 |         54 |
+| api                                                                                   |          7 |        400 |         36 |         94 |        530 |
+| api (Files)                                                                           |          2 |         72 |          1 |         22 |         95 |
+| api/routes                                                                            |          5 |        328 |         35 |         72 |        435 |
+| core                                                                                  |          7 |        124 |          0 |         35 |        159 |
+| db                                                                                    |         10 |        146 |         24 |         50 |        220 |
+| db (Files)                                                                            |          3 |         26 |          2 |          9 |         37 |
+| db/models                                                                             |          7 |        120 |         22 |         41 |        183 |
+| schemas                                                                               |          5 |         99 |          3 |         42 |        144 |
+| services                                                                              |          9 |        648 |         78 |        156 |        882 |
+| utils                                                                                 |          2 |         23 |          2 |         10 |         35 |
+| workers                                                                               |          3 |          0 |          0 |          3 |          3 |
++---------------------------------------------------------------------------------------+------------+------------+------------+------------+------------+
+
+Files
++---------------------------------------------------------------------------------------+----------+------------+------------+------------+------------+
+| filename                                                                              | language | code       | comment    | blank      | total      |
++---------------------------------------------------------------------------------------+----------+------------+------------+------------+------------+
+| /home/zo/Desktop/CODE/Projects/payment_gateway/app/__init__.py                        | Python   |          0 |          0 |          1 |          1 |
+| /home/zo/Desktop/CODE/Projects/payment_gateway/app/api/__init__.py                    | Python   |          0 |          0 |          1 |          1 |
+| /home/zo/Desktop/CODE/Projects/payment_gateway/app/api/deps.py                        | Python   |         72 |          1 |         21 |         94 |
+| /home/zo/Desktop/CODE/Projects/payment_gateway/app/api/routes/__init__.py             | Python   |          0 |          0 |          1 |          1 |
+| /home/zo/Desktop/CODE/Projects/payment_gateway/app/api/routes/auth_debug.py           | Python   |         39 |         34 |         17 |         90 |
+| /home/zo/Desktop/CODE/Projects/payment_gateway/app/api/routes/merchants.py            | Python   |         29 |          1 |          8 |         38 |
+| /home/zo/Desktop/CODE/Projects/payment_gateway/app/api/routes/payment_intents.py      | Python   |        148 |          0 |         21 |        169 |
+| /home/zo/Desktop/CODE/Projects/payment_gateway/app/api/routes/webhooks.py             | Python   |        112 |          0 |         25 |        137 |
+| /home/zo/Desktop/CODE/Projects/payment_gateway/app/core/__init__.py                   | Python   |          0 |          0 |          1 |          1 |
+| /home/zo/Desktop/CODE/Projects/payment_gateway/app/core/config.py                     | Python   |          8 |          0 |          4 |         12 |
+| /home/zo/Desktop/CODE/Projects/payment_gateway/app/core/enums.py                      | Python   |         16 |          0 |          2 |         18 |
+| /home/zo/Desktop/CODE/Projects/payment_gateway/app/core/logging.py                    | Python   |          0 |          0 |          1 |          1 |
+| /home/zo/Desktop/CODE/Projects/payment_gateway/app/core/rate_limit.py                 | Python   |         56 |          0 |         19 |         75 |
+| /home/zo/Desktop/CODE/Projects/payment_gateway/app/core/security.py                   | Python   |         10 |          0 |          2 |         12 |
+| /home/zo/Desktop/CODE/Projects/payment_gateway/app/core/state_machine.py              | Python   |         34 |          0 |          6 |         40 |
+| /home/zo/Desktop/CODE/Projects/payment_gateway/app/db/__init__.py                     | Python   |          0 |          0 |          1 |          1 |
+| /home/zo/Desktop/CODE/Projects/payment_gateway/app/db/base.py                         | Python   |          8 |          2 |          3 |         13 |
+| /home/zo/Desktop/CODE/Projects/payment_gateway/app/db/models/__init__.py              | Python   |          0 |          0 |          1 |          1 |
+| /home/zo/Desktop/CODE/Projects/payment_gateway/app/db/models/charge.py                | Python   |         31 |          0 |          7 |         38 |
+| /home/zo/Desktop/CODE/Projects/payment_gateway/app/db/models/customer.py              | Python   |          0 |          0 |          1 |          1 |
+| /home/zo/Desktop/CODE/Projects/payment_gateway/app/db/models/idempotency_record.py    | Python   |         12 |         16 |         10 |         38 |
+| /home/zo/Desktop/CODE/Projects/payment_gateway/app/db/models/merchant.py              | Python   |         14 |          0 |          4 |         18 |
+| /home/zo/Desktop/CODE/Projects/payment_gateway/app/db/models/payment_intent.py        | Python   |         34 |          0 |          4 |         38 |
+| /home/zo/Desktop/CODE/Projects/payment_gateway/app/db/models/webhook_event.py         | Python   |         29 |          6 |         14 |         49 |
+| /home/zo/Desktop/CODE/Projects/payment_gateway/app/db/session.py                      | Python   |         18 |          0 |          5 |         23 |
+| /home/zo/Desktop/CODE/Projects/payment_gateway/app/main.py                            | Python   |         32 |         12 |          9 |         53 |
+| /home/zo/Desktop/CODE/Projects/payment_gateway/app/schemas/__init__.py                | Python   |          0 |          0 |          1 |          1 |
+| /home/zo/Desktop/CODE/Projects/payment_gateway/app/schemas/charge.py                  | Python   |         11 |          0 |          6 |         17 |
+| /home/zo/Desktop/CODE/Projects/payment_gateway/app/schemas/merchant.py                | Python   |         15 |          0 |          8 |         23 |
+| /home/zo/Desktop/CODE/Projects/payment_gateway/app/schemas/payment_intent.py          | Python   |         39 |          3 |         17 |         59 |
+| /home/zo/Desktop/CODE/Projects/payment_gateway/app/schemas/webhook.py                 | Python   |         34 |          0 |         10 |         44 |
+| /home/zo/Desktop/CODE/Projects/payment_gateway/app/services/__init__.py               | Python   |          0 |          0 |          1 |          1 |
+| /home/zo/Desktop/CODE/Projects/payment_gateway/app/services/auth_service.py           | Python   |          8 |          0 |          8 |         16 |
+| /home/zo/Desktop/CODE/Projects/payment_gateway/app/services/charge_service.py         | Python   |         37 |          6 |          9 |         52 |
+| /home/zo/Desktop/CODE/Projects/payment_gateway/app/services/idempotency_service.py    | Python   |         70 |          5 |         12 |         87 |
+| /home/zo/Desktop/CODE/Projects/payment_gateway/app/services/payment_intent_service.py | Python   |        351 |         47 |         76 |        474 |
+| /home/zo/Desktop/CODE/Projects/payment_gateway/app/services/payment_service.py        | Python   |         23 |          0 |          9 |         32 |
+| /home/zo/Desktop/CODE/Projects/payment_gateway/app/services/payment_state_machine.py  | Python   |         43 |          6 |         15 |         64 |
+| /home/zo/Desktop/CODE/Projects/payment_gateway/app/services/refund_service.py         | Python   |          5 |          0 |          2 |          7 |
+| /home/zo/Desktop/CODE/Projects/payment_gateway/app/services/webhook_service.py        | Python   |        111 |         14 |         24 |        149 |
+| /home/zo/Desktop/CODE/Projects/payment_gateway/app/utils/api_key.py                   | Python   |          3 |          2 |          4 |          9 |
+| /home/zo/Desktop/CODE/Projects/payment_gateway/app/utils/hashing.py                   | Python   |         20 |          0 |          6 |         26 |
+| /home/zo/Desktop/CODE/Projects/payment_gateway/app/workers/__init__.py                | Python   |          0 |          0 |          1 |          1 |
+| /home/zo/Desktop/CODE/Projects/payment_gateway/app/workers/celery_app.py              | Python   |          0 |          0 |          1 |          1 |
+| /home/zo/Desktop/CODE/Projects/payment_gateway/app/workers/tasks.py                   | Python   |          0 |          0 |          1 |          1 |
+| Total                                                                                 |          |      1,472 |        155 |        400 |      2,027 |
++---------------------------------------------------------------------------------------+----------+------------+------------+------------+------------+
