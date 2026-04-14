@@ -7,12 +7,12 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_merchant, get_db
 from app.core.security import bearer_scheme, get_bearer_token
+from app.db.models.charge import Charge
 from app.db.models.merchant import Merchant
+from app.schemas.charge import ChargeResponse
 from app.schemas.merchant import MerchantCreateResponse, MerchantResponse
 from app.utils.api_key import generate_api_key
 from app.utils.hashing import hash_api_key
-from app.db.models.charge import Charge
-from app.schemas.charge import ChargeResponse
 
 router = APIRouter()
 

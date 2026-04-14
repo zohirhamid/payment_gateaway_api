@@ -1,8 +1,8 @@
-from sqlalchemy import DateTime, String, func
+from sqlalchemy import Column, DateTime, Integer, String, func
 from sqlalchemy.orm import Mapped, mapped_column
-from sqlalchemy import Column, String, Integer
 
 from app.db.base import Base
+
 
 class Merchant(Base):
     __tablename__ = "merchants"

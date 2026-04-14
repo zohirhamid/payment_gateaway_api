@@ -1,14 +1,14 @@
+from importlib import import_module
+
 from fastapi import Depends, Header, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
+from app.core.rate_limit import RateLimitRule, enforce_rate_limit
 from app.core.security import bearer_scheme, get_bearer_token
 from app.db.session import get_db
 from app.services.auth_service import get_merchant_by_api_key
-
-from importlib import import_module
-from app.core.rate_limit import RateLimitRule, enforce_rate_limit
 
 _redis_client = None
 
@@ -27,6 +27,12 @@ CONFIRM_PAYMENT_RULE = RateLimitRule(
 
 CANCEL_PAYMENT_RULE = RateLimitRule(
     scope="cancel_payment",
+    limit=10,
+    window_seconds=60,
+)
+
+CAPTURE_PAYMENT_RULE = RateLimitRule(
+    scope="capture_payment",
     limit=10,
     window_seconds=60,
 )
@@ -84,3 +90,4 @@ def rate_limit_dependency(rule: RateLimitRule):
 create_payment_intent_rate_limit = rate_limit_dependency(CREATE_PAYMENT_INTENT_RULE)
 confirm_payment_rate_limit = rate_limit_dependency(CONFIRM_PAYMENT_RULE)
 cancel_payment_rate_limit = rate_limit_dependency(CANCEL_PAYMENT_RULE)
+capture_payment_rate_limit = rate_limit_dependency(CAPTURE_PAYMENT_RULE)

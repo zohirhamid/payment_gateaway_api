@@ -26,3 +26,13 @@ class Charge(Base):
         server_default=func.now(),
         nullable=False,
     )
+
+
+'''
+charge should conceptually support:
+
+pending
+authorized
+captured
+failed
+'''

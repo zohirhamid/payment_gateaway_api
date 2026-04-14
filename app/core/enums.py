@@ -12,6 +12,7 @@ class PaymentIntentStatus(str, Enum):
     REQUIRES_PAYMENT_METHOD = "requires_payment_method"
     REQUIRES_CONFIRMATION = "requires_confirmation"
     PROCESSING = "processing"
+    REQUIRES_CAPTURE = "requires_capture"
     SUCCEEDED = "succeeded"
     FAILED = "failed"
     CANCELED = "canceled"

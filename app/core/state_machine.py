@@ -10,7 +10,13 @@ ALLOWED_TRANSITIONS: dict[PaymentIntentStatus, set[PaymentIntentStatus]] = {
         PaymentIntentStatus.CANCELED,
     },
     PaymentIntentStatus.PROCESSING: {
+        PaymentIntentStatus.REQUIRES_CAPTURE,
         PaymentIntentStatus.SUCCEEDED,
+        PaymentIntentStatus.FAILED,
+    },
+    PaymentIntentStatus.REQUIRES_CAPTURE: {
+        PaymentIntentStatus.SUCCEEDED,
+        PaymentIntentStatus.CANCELED,
         PaymentIntentStatus.FAILED,
     },
     PaymentIntentStatus.SUCCEEDED: set(),

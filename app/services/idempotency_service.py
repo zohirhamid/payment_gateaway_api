@@ -1,6 +1,10 @@
+import json
+
+from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from app.db.models.idempotency_record import IdempotencyRecord
+
 
 def get_idempotency_record(
         db: Session,
@@ -19,6 +23,42 @@ def get_idempotency_record(
         )
         .first()
     )
+
+
+def check_idempotency(
+    *,
+    db: Session,
+    merchant_id: int,
+    endpoint: str,
+    idempotency_key: str | None,
+    request_hash: str,
+) -> dict | None:
+    """
+    Return a stored response body for a matching idempotency request.
+
+    If the key exists with a different payload hash, raise HTTPException(409).
+    """
+    if not idempotency_key:
+        return None
+
+    existing_record = get_idempotency_record(
+        db=db,
+        merchant_id=merchant_id,
+        endpoint=endpoint,
+        idempotency_key=idempotency_key,
+    )
+
+    if existing_record is None:
+        return None
+
+    if existing_record.request_hash != request_hash:
+        raise HTTPException(
+            status_code=409,
+            detail="Idempotency key was already used with a different payload.",
+        )
+
+    return json.loads(existing_record.response_body)
+
 
 def create_idempotency_record(
     db: Session,

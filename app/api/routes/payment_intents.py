@@ -1,33 +1,35 @@
-from typing import List
-
 from datetime import datetime
+from typing import List
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Query
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_merchant, get_db, get_idempotency_key
-
-from app.db.models.merchant import Merchant
-from app.schemas.payment_intent import PaymentIntentCreate, PaymentIntentResponse
-
-from app.schemas.payment_intent import PaymentIntentConfirmResponse
-
-from app.services.webhook_service import deliver_webhook_event_task
-
-from app.api.deps import (
-    create_payment_intent_rate_limit,
-    cancel_payment_rate_limit,
-    confirm_payment_rate_limit,
-)
-
-from app.services.payment_intent_service import (
-    cancel_payment_intent as cancel_payment_intent_service,
-    create_payment_intent as create_payment_intent_service,
-    confirm_payment_intent as confirm_payment_intent_service,
-    get_payment_intent as get_payment_intent_service,
-    list_payment_intents as list_payment_intents_service,
-)
+from app.api.deps import (cancel_payment_rate_limit,
+                          capture_payment_rate_limit,
+                          confirm_payment_rate_limit,
+                          create_payment_intent_rate_limit,
+                          get_current_merchant, get_db, get_idempotency_key)
 from app.core.enums import PaymentIntentStatus
+from app.db.models.merchant import Merchant
+from app.schemas.payment_intent import (PaymentIntentAttachPaymentMethod,
+                                        PaymentIntentConfirmResponse,
+                                        PaymentIntentCreate,
+                                        PaymentIntentResponse)
+from app.services.payment_intent_service import \
+    attach_payment_method as attach_payment_method_service
+from app.services.payment_intent_service import \
+    cancel_payment_intent as cancel_payment_intent_service
+from app.services.payment_intent_service import \
+    capture_payment_intent as capture_payment_intent_service
+from app.services.payment_intent_service import \
+    confirm_payment_intent as confirm_payment_intent_service
+from app.services.payment_intent_service import \
+    create_payment_intent as create_payment_intent_service
+from app.services.payment_intent_service import \
+    get_payment_intent as get_payment_intent_service
+from app.services.payment_intent_service import \
+    list_payment_intents as list_payment_intents_service
+from app.services.webhook_service import deliver_webhook_event_task
 
 router = APIRouter(prefix="/payment_intents", tags=["payment_intents"])
 
@@ -105,6 +107,31 @@ def confirm_payment_intent(
 
 
 @router.post(
+    "/{payment_intent_id}/capture",
+    dependencies=[Depends(capture_payment_rate_limit)],
+    response_model=PaymentIntentResponse,
+)
+def capture_payment_intent(
+    payment_intent_id: int,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    current_merchant: Merchant = Depends(get_current_merchant),
+    idempotency_key: str | None = Depends(get_idempotency_key),
+):
+    response_payload, webhook_event_id = capture_payment_intent_service(
+        db=db,
+        merchant_id=current_merchant.id,
+        payment_intent_id=payment_intent_id,
+        idempotency_key=idempotency_key,
+    )
+
+    if webhook_event_id is not None:
+        background_tasks.add_task(deliver_webhook_event_task, webhook_event_id)
+
+    return PaymentIntentResponse(**response_payload)
+
+
+@router.post(
     "/{payment_intent_id}/cancel",
     dependencies=[Depends(cancel_payment_rate_limit)],
     response_model=PaymentIntentResponse,
@@ -123,3 +150,19 @@ def cancel_payment_intent(
     )
     
     return PaymentIntentResponse(**payload)
+
+
+@router.post("/{payment_intent_id}/attach_payment_method", response_model=PaymentIntentResponse)
+def attach_payment_method(
+    payment_intent_id: int,
+    payload: PaymentIntentAttachPaymentMethod,
+    db: Session = Depends(get_db),
+    current_merchant: Merchant = Depends(get_current_merchant),
+) -> PaymentIntentResponse:
+    response_payload = attach_payment_method_service(
+        db=db,
+        merchant_id=current_merchant.id,
+        payment_intent_id=payment_intent_id,
+        payment_method_reference=payload.payment_method_reference,
+    )
+    return PaymentIntentResponse(**response_payload)

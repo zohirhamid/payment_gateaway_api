@@ -46,5 +46,5 @@ def test_webhook_event_created_after_confirm():
     latest_event = events[0]
 
     assert latest_event["payment_intent_id"] == payment_intent_id
-    assert latest_event["event_type"] in ["payment.succeeded", "payment.failed"]
+    assert latest_event["event_type"] in ["payment.succeeded", "payment.failed", "payment.requires_capture"]
     assert latest_event["delivery_status"] in ["pending", "delivered", "failed"]

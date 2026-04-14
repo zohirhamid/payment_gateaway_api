@@ -1,25 +1,17 @@
 import json
 from typing import List
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_merchant, get_db
 from app.db.models.merchant import Merchant
-
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
-
 from app.db.models.webhook_event import WebhookEvent
-from app.schemas.webhook import (
-    BulkWebhookRetryResponse,
-    WebhookEventResponse,
-    WebhookRetryResponse,
-)
-from app.services.webhook_service import (
-    MAX_WEBHOOK_RETRIES,
-    can_retry_webhook_event,
-    deliver_webhook_event_task,
-)
+from app.schemas.webhook import (BulkWebhookRetryResponse,
+                                 WebhookEventResponse, WebhookRetryResponse)
+from app.services.webhook_service import (MAX_WEBHOOK_RETRIES,
+                                          can_retry_webhook_event,
+                                          deliver_webhook_event_task)
 
 router = APIRouter(prefix="/webhooks", tags=["webhooks"])
 

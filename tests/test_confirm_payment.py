@@ -40,7 +40,7 @@ def test_confirm_payment_intent_once_only():
     first_confirm_data = first_confirm_response.json()
     assert first_confirm_data["payment_intent_id"] == payment_intent_id
     assert "charge_id" in first_confirm_data
-    assert first_confirm_data["status"] in ["succeeded", "failed"]
+    assert first_confirm_data["status"] in ["requires_capture", "failed"]
 
     second_confirm_response = client.post(
         f"/payment_intents/{payment_intent_id}/confirm",

@@ -1,9 +1,9 @@
-from sqlalchemy import DateTime, ForeignKey, String, func, Enum, JSON
+from sqlalchemy import JSON, DateTime, Enum, ForeignKey, String, func
 from sqlalchemy.orm import Mapped, mapped_column
+
 from app.core.enums import PaymentIntentStatus
-
-
 from app.db.base import Base
+
 
 class PaymentIntent(Base):
     __tablename__ = "payment_intents"
@@ -18,7 +18,7 @@ class PaymentIntent(Base):
         default=PaymentIntentStatus.REQUIRES_PAYMENT_METHOD,
     )
     extra_data: Mapped[dict | None] = mapped_column(JSON, nullable=True)
-    #payment_method_reference: Mapped[] = mapped_column() (a reference to payment_methods table)
+    payment_method_reference: Mapped[str | None] = mapped_column(String(255), nullable=True) # (a reference to payment_methods table)
     failure_reason: Mapped[str | None] = mapped_column(String(255), nullable=True)
     created_at: Mapped[DateTime] = mapped_column(
         DateTime(timezone=True),

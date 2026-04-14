@@ -4,3 +4,6 @@ __pycache__/
 .venv/
 venv/
 payment_gateway.dbSEPARATION_OF_CONCERNS.md
+SEPARATION_OF_CONCERNS.md
+payment_gateway.db
+.gitignore

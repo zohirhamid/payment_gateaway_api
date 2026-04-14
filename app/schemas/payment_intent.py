@@ -1,6 +1,7 @@
 """Pydantic schemas used by the PaymentIntent API endpoints."""
 
 from datetime import datetime
+
 from pydantic import BaseModel, Field, field_validator
 
 
@@ -51,3 +52,7 @@ class PaymentIntentConfirmResponse(BaseModel):
     payment_intent_id: int
     charge_id: int
     status: str
+
+
+class PaymentIntentAttachPaymentMethod(BaseModel):
+    payment_method_reference: str = Field(..., min_length=1)

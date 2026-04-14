@@ -17,7 +17,6 @@ from app.api.routes.auth_debug import router as auth_debug_router
 from app.api.routes.merchants import router as merchants_router
 from app.api.routes.payment_intents import router as payment_intents_router
 from app.api.routes.webhooks import router as webhooks_router
-
 from app.core.config import settings
 from app.db.base import Base
 from app.db.session import engine

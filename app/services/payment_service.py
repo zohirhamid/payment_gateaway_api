@@ -3,20 +3,11 @@ import random
 from app.db.models.payment_intent import PaymentIntent
 from app.schemas.webhook import WebhookEventPayload, WebhookPaymentData
 
+
 def simulate_payment_result() -> str:
-    """
-    Simulate the outcome of payment processing.
+    return "authorized" if random.random() < 0.8 else "failed"
 
-    For this MVP:
-    - Most payments succeed
-    - Some payments fail
-
-    Returns:
-        "succeeded" or "failed"
-    """
-    return "succeeded" if random.random() < 0.8 else "failed"
-
-def build_webhook_payload(payment_intent: PaymentIntent, event_id: int):
+def build_webhook_payload(payment_intent: PaymentIntent, event_id: int, event_type: str):
     '''
     Build the webhook payload for a payment outcome event.
 
@@ -25,11 +16,6 @@ def build_webhook_payload(payment_intent: PaymentIntent, event_id: int):
     '''
 
     status_value = getattr(payment_intent.status, "value", payment_intent.status)
-    event_type = (
-        "payment.succeeded"
-        if status_value == "succeeded"
-        else "payment.failed"
-    )
 
     payload = WebhookEventPayload(
         id=event_id,

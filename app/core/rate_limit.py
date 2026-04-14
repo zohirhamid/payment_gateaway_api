@@ -1,9 +1,10 @@
+import time
 from dataclasses import dataclass
 
-import time
-
 from fastapi import Depends, HTTPException
+
 from app.db.models.merchant import Merchant
+
 
 @dataclass(frozen=True)
 class RateLimitRule:

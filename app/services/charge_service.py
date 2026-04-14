@@ -37,8 +37,8 @@ def create_and_process_charge(
     result = simulate_payment_result()
     failure_reason = None
 
-    if result == "succeeded":
-        charge.status = "succeeded"
+    if result == "authorized":
+        charge.status = "authorized"
     else:
         charge.status = "failed"
         failure_reason = "Payment was declined"

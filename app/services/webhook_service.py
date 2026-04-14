@@ -1,14 +1,11 @@
+import json
 from datetime import datetime
-import json
 from time import timezone
+
 import httpx
-
 from sqlalchemy.orm import Session
+
 from app.db.models.merchant import Merchant
-from app.db.models.webhook_event import WebhookEvent
-
-import json
-from sqlalchemy.orm import Session
 from app.db.models.webhook_event import WebhookEvent
 from app.db.session import SessionLocal
 

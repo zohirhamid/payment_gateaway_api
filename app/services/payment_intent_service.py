@@ -1,22 +1,32 @@
 import json
-
 from datetime import datetime
 
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from app.core.enums import PaymentIntentStatus
+from app.db.models.charge import Charge
 from app.db.models.payment_intent import PaymentIntent
 from app.schemas.payment_intent import PaymentIntentCreate
 from app.services.charge_service import create_and_process_charge
-from app.services.idempotency_service import (
-    create_idempotency_record,
-    get_idempotency_record,
-)
+from app.services.idempotency_service import (check_idempotency,
+                                              create_idempotency_record)
 from app.services.payment_service import build_webhook_payload
-from app.services.payment_state_machine import apply_payment_intent_status_transition
+from app.services.payment_state_machine import \
+    apply_payment_intent_status_transition
 from app.services.webhook_service import create_webhook_event
 from app.utils.hashing import hash_request_payload
+
+
+def _build_payment_intent_response(payment_intent: PaymentIntent) -> dict:
+    return {
+        "id": payment_intent.id,
+        "merchant_id": payment_intent.merchant_id,
+        "amount": payment_intent.amount,
+        "currency": payment_intent.currency,
+        "status": getattr(payment_intent.status, "value", payment_intent.status),
+        "created_at": payment_intent.created_at.isoformat(),  # type: ignore[union-attr]
+    }
 
 
 def create_payment_intent(
@@ -33,20 +43,15 @@ def create_payment_intent(
     endpoint = "create_payment_intent"
     request_hash = hash_request_payload(payload.model_dump())
 
-    if idempotency_key:
-        existing_record = get_idempotency_record(
-            db=db,
-            merchant_id=merchant_id,
-            endpoint=endpoint,
-            idempotency_key=idempotency_key,
-        )
-        if existing_record:
-            if existing_record.request_hash != request_hash:
-                raise HTTPException(
-                    status_code=409,
-                    detail="Idempotency key was already used with a different payload.",
-                )
-            return json.loads(existing_record.response_body)
+    existing_response = check_idempotency(
+        db=db,
+        merchant_id=merchant_id,
+        endpoint=endpoint,
+        idempotency_key=idempotency_key,
+        request_hash=request_hash,
+    )
+    if existing_response is not None:
+        return existing_response
 
     payment_intent = PaymentIntent(
         merchant_id=merchant_id,
@@ -59,14 +64,7 @@ def create_payment_intent(
     db.commit()
     db.refresh(payment_intent)
 
-    response_payload = {
-        "id": payment_intent.id,
-        "merchant_id": payment_intent.merchant_id,
-        "amount": payment_intent.amount,
-        "currency": payment_intent.currency,
-        "status": getattr(payment_intent.status, "value", payment_intent.status),
-        "created_at": payment_intent.created_at.isoformat(),  # type: ignore[union-attr]
-    }
+    response_payload = _build_payment_intent_response(payment_intent)
 
     if idempotency_key:
         create_idempotency_record(
@@ -90,14 +88,6 @@ def get_payment_intent(
 ) -> PaymentIntent:
     """
     Fetch a single payment intent scoped to a merchant.
-
-    Inputs:
-        db: SQLAlchemy session.
-        merchant_id: Authenticated merchant id (ownership scope).
-        payment_intent_id: Payment intent id to fetch.
-
-    Output:
-        PaymentIntent model instance.
     """
     payment_intent = (
         db.query(PaymentIntent)
@@ -112,6 +102,38 @@ def get_payment_intent(
         raise HTTPException(status_code=404, detail="Payment intent not found.")
 
     return payment_intent
+
+
+def attach_payment_method(
+    *,
+    db: Session,
+    merchant_id: int,
+    payment_intent_id: int,
+    payment_method_reference: str,
+) -> dict:
+    payment_intent = get_payment_intent(
+        db=db,
+        merchant_id=merchant_id,
+        payment_intent_id=payment_intent_id,
+    )
+
+    if payment_intent.status != PaymentIntentStatus.REQUIRES_PAYMENT_METHOD:
+        raise HTTPException(
+            status_code=409,
+            detail="Payment method cannot be attached in the current state.",
+        )
+
+    existing_extra_data = payment_intent.extra_data or {}
+    existing_extra_data["payment_method_reference"] = payment_method_reference
+    payment_intent.extra_data = existing_extra_data
+
+    payment_intent = apply_payment_intent_status_transition(
+        db=db,
+        payment_intent=payment_intent,
+        new_status=PaymentIntentStatus.REQUIRES_CONFIRMATION,
+    )
+
+    return _build_payment_intent_response(payment_intent)
 
 
 def list_payment_intents(
@@ -193,32 +215,21 @@ def cancel_payment_intent(
     endpoint = "cancel_payment_intent"
     request_hash = hash_request_payload({"payment_intent_id": payment_intent_id})
 
-    if idempotency_key:
-        existing_record = get_idempotency_record(
-            db=db,
-            merchant_id=merchant_id,
-            endpoint=endpoint,
-            idempotency_key=idempotency_key,
-        )
-        if existing_record:
-            if existing_record.request_hash != request_hash:
-                raise HTTPException(
-                    status_code=409,
-                    detail="Idempotency key was already used with a different payload.",
-                )
-            return json.loads(existing_record.response_body)
-
-    payment_intent = (
-        db.query(PaymentIntent)
-        .filter(
-            PaymentIntent.id == payment_intent_id,
-            PaymentIntent.merchant_id == merchant_id,
-        )
-        .first()
+    existing_response = check_idempotency(
+        db=db,
+        merchant_id=merchant_id,
+        endpoint=endpoint,
+        idempotency_key=idempotency_key,
+        request_hash=request_hash,
     )
+    if existing_response is not None:
+        return existing_response
 
-    if payment_intent is None:
-        raise HTTPException(status_code=404, detail="Payment intent not found.")
+    payment_intent = get_payment_intent(
+        db=db,
+        merchant_id=merchant_id,
+        payment_intent_id=payment_intent_id,
+    )
 
     if payment_intent.status not in {
         PaymentIntentStatus.REQUIRES_PAYMENT_METHOD,
@@ -235,14 +246,7 @@ def cancel_payment_intent(
         new_status=PaymentIntentStatus.CANCELED,
     )
 
-    response_payload = {
-        "id": payment_intent.id,
-        "merchant_id": payment_intent.merchant_id,
-        "amount": payment_intent.amount,
-        "currency": payment_intent.currency,
-        "status": getattr(payment_intent.status, "value", payment_intent.status),
-        "created_at": payment_intent.created_at.isoformat(),  # type: ignore[union-attr]
-    }
+    response_payload = _build_payment_intent_response(payment_intent)
 
     if idempotency_key:
         create_idempotency_record(
@@ -278,45 +282,38 @@ def confirm_payment_intent(
     endpoint = "confirm_payment_intent"
     request_hash = hash_request_payload({"payment_intent_id": payment_intent_id})
 
-    if idempotency_key:
-        existing_record = get_idempotency_record(
-            db=db,
-            merchant_id=merchant_id,
-            endpoint=endpoint,
-            idempotency_key=idempotency_key,
-        )
-        if existing_record:
-            if existing_record.request_hash != request_hash:
-                raise HTTPException(
-                    status_code=409,
-                    detail="Idempotency key was already used with a different payload.",
-                )
-            return json.loads(existing_record.response_body), None
+    existing_response = check_idempotency(
+        db=db,
+        merchant_id=merchant_id,
+        endpoint=endpoint,
+        idempotency_key=idempotency_key,
+        request_hash=request_hash,
+    )
+    if existing_response is not None:
+        return existing_response, None
 
-    payment_intent = (
-        db.query(PaymentIntent)
-        .filter(
-            PaymentIntent.id == payment_intent_id,
-            PaymentIntent.merchant_id == merchant_id,
-        )
-        .first()
+    payment_intent = get_payment_intent(
+        db=db,
+        merchant_id=merchant_id,
+        payment_intent_id=payment_intent_id,
     )
 
-    if payment_intent is None:
-        raise HTTPException(status_code=404, detail="Payment intent not found.")
-
     # Only confirm once in this MVP.
-    if payment_intent.status != PaymentIntentStatus.REQUIRES_PAYMENT_METHOD:
+    if payment_intent.status not in {
+        PaymentIntentStatus.REQUIRES_PAYMENT_METHOD,
+        PaymentIntentStatus.REQUIRES_CONFIRMATION,
+    }:
         raise HTTPException(
             status_code=409,
             detail="Payment intent has already been processed or is not confirmable.",
         )
 
-    payment_intent = apply_payment_intent_status_transition(
-        db=db,
-        payment_intent=payment_intent,
-        new_status=PaymentIntentStatus.REQUIRES_CONFIRMATION,
-    )
+    if payment_intent.status == PaymentIntentStatus.REQUIRES_PAYMENT_METHOD:
+        payment_intent = apply_payment_intent_status_transition(
+            db=db,
+            payment_intent=payment_intent,
+            new_status=PaymentIntentStatus.REQUIRES_CONFIRMATION,
+        )
 
     payment_intent = apply_payment_intent_status_transition(
         db=db,
@@ -334,20 +331,21 @@ def confirm_payment_intent(
         db=db,
         payment_intent=payment_intent,
         new_status=(
-            PaymentIntentStatus.SUCCEEDED
-            if charge.status == "succeeded"
+            PaymentIntentStatus.REQUIRES_CAPTURE
+            if charge.status == "authorized"
             else PaymentIntentStatus.FAILED
         ),
         failure_reason=failure_reason,
     )
 
-    event_type = (
-        "payment.succeeded"
-        if payment_intent.status == PaymentIntentStatus.SUCCEEDED
-        else "payment.failed"
-    )
+    if payment_intent.status == PaymentIntentStatus.SUCCEEDED:
+        event_type = "payment.succeeded"
+    elif payment_intent.status == PaymentIntentStatus.REQUIRES_CAPTURE:
+        event_type = "payment.requires_capture"
+    else:
+        event_type = "payment.failed"
 
-    webhook_payload = build_webhook_payload(payment_intent=payment_intent, event_id=0)
+    webhook_payload = build_webhook_payload(payment_intent=payment_intent, event_id=0, event_type=event_type)
 
     webhook_event = create_webhook_event(
         db=db,
@@ -362,6 +360,104 @@ def confirm_payment_intent(
         "charge_id": charge.id,
         "status": getattr(payment_intent.status, "value", payment_intent.status),
     }
+
+    if idempotency_key:
+        create_idempotency_record(
+            db=db,
+            merchant_id=merchant_id,
+            endpoint=endpoint,
+            idempotency_key=idempotency_key,
+            request_hash=request_hash,
+            response_status_code=200,
+            response_body=json.dumps(response_payload),
+        )
+
+    return response_payload, webhook_event.id
+
+
+def capture_payment_intent(
+    *,
+    db: Session,
+    merchant_id: int,
+    payment_intent_id: int,
+    idempotency_key: str | None,
+) -> tuple[dict, int | None]:
+    """
+    Capture a previously authorized payment intent.
+
+    Output:
+        (capture_response_payload, webhook_event_id)
+
+        If an idempotency record is replayed, webhook_event_id is None to avoid
+        scheduling duplicate webhook delivery.
+    """
+
+    endpoint = "capture_payment_intent"
+    request_hash = hash_request_payload({"payment_intent_id": payment_intent_id})
+
+    existing_response = check_idempotency(
+        db=db,
+        merchant_id=merchant_id,
+        endpoint=endpoint,
+        idempotency_key=idempotency_key,
+        request_hash=request_hash,
+    )
+    if existing_response is not None:
+        return existing_response, None
+
+    payment_intent = get_payment_intent(
+        db=db,
+        merchant_id=merchant_id,
+        payment_intent_id=payment_intent_id,
+    )
+
+    if payment_intent.status != PaymentIntentStatus.REQUIRES_CAPTURE:
+        raise HTTPException(
+            status_code=409,
+            detail="Payment intent cannot be captured in its current state.",
+        )
+
+    # Find the associated charge and update its status to captured
+    charge = (
+        db.query(Charge)
+        .filter(
+            Charge.payment_intent_id == payment_intent_id,
+            Charge.merchant_id == merchant_id,
+        )
+        .first()
+    )
+
+    if charge is None:
+        raise HTTPException(status_code=404, detail="Charge not found.")
+
+    if charge.status != "authorized":
+        raise HTTPException(
+            status_code=409,
+            detail="Charge is not in a capturable state.",
+        )
+
+    charge.status = "captured"
+    db.add(charge)
+    db.commit()
+    db.refresh(charge)
+
+    payment_intent = apply_payment_intent_status_transition(
+        db=db,
+        payment_intent=payment_intent,
+        new_status=PaymentIntentStatus.SUCCEEDED,
+    )
+
+    webhook_payload = build_webhook_payload(payment_intent=payment_intent, event_id=0, event_type="payment.succeeded")
+
+    webhook_event = create_webhook_event(
+        db=db,
+        merchant_id=merchant_id,
+        payment_intent_id=payment_intent.id,
+        event_type="payment.succeeded",
+        payload=webhook_payload,
+    )
+
+    response_payload = _build_payment_intent_response(payment_intent)
 
     if idempotency_key:
         create_idempotency_record(
